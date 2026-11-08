@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de Cuotas de Cobro</title>
+<style>
+:root{--verde:#1E5B3A;--verde-cl:#E8F2EC;--fondo:#F5F7F6;--texto:#141414;--texto2:#5E6A63;--borde:#DDE4DF;--kraft:#7A5530;--kraft-cl:#F6EEE3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--texto);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--verde);color:#fff;padding:18px 16px}
+header h1{margin:0;font-size:19px}
+header p{margin:4px 0 0;font-size:13px;opacity:.85}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:block;font-size:13px;font-weight:600;color:#344054;margin-bottom:4px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--borde);border-radius:10px;font:inherit;background:#fff}
+input:focus,select:focus{outline:2px solid var(--verde);outline-offset:-1px}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--verde-cl);border-radius:10px;padding:12px}
+.kpi .l{font-size:12px;color:var(--texto2)}
+.kpi .v{font-size:22px;font-weight:800;color:var(--verde);font-variant-numeric:tabular-nums}
+.regla{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--kraft-cl);color:var(--kraft);font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{background:var(--verde);color:#fff;text-align:left;padding:8px;font-weight:600}
+td{border-bottom:1px solid var(--borde);padding:8px}
+td.n,th.n{text-align:right}
+.tbl{overflow-x:auto}
+h2{font-size:16px;margin:0 0 10px;color:var(--verde)}
+footer{text-align:center;font-size:12px;color:var(--texto2);padding:10px 16px 24px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Calculadora de Cuotas de Cobro</h1>
+  <p>Quebrados y Dañados · cuánto paga cada responsable y en cuántas cuotas</p>
+</header>
+<main>
+  <div class="card">
+    <div class="grid">
+      <div><label for="costo">Costo unitario (Q)</label><input id="costo" type="number" min="0" step="0.01" value="74.99" inputmode="decimal"></div>
+      <div><label for="unid">Unidades</label><input id="unid" type="number" min="1" step="1" value="2" inputmode="numeric"></div>
+      <div><label for="resp">Responsables</label><input id="resp" type="number" min="1" step="1" value="2" inputmode="numeric"></div>
+      <div><label for="cuotas">Cuotas</label><input id="cuotas" type="number" min="1" step="1" value="3" inputmode="numeric"></div>
+      <div><label for="mes">Mes de inicio</label><select id="mes"></select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Resultado</h2>
+    <div class="res">
+      <div class="kpi"><div class="l">Total a cobrar</div><div class="v" id="rTotal">—</div></div>
+      <div class="kpi"><div class="l">Por responsable</div><div class="v" id="rResp">—</div></div>
+      <div class="kpi"><div class="l">Cuota por responsable</div><div class="v" id="rCuota">—</div></div>
+    </div>
+    <div class="regla" id="regla"></div>
+  </div>
+
+  <div class="card">
+    <h2>Calendario de descuentos (por responsable)</h2>
+    <div class="tbl"><table id="cal"></table></div>
+  </div>
+</main>
+<footer>Página de práctica para GitHub Pages · no guarda ningún dato · solo hace cálculos.</footer>
+
+<script>
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const $=id=>document.getElementById(id);
+const Q=n=>'Q '+n.toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const LIMITE=25; // hasta Q25: se cobra de una sola vez
+
+const hoy=new Date();
+$('mes').innerHTML=MESES.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+$('mes').value=hoy.getMonth();
+
+function calcular(){
+  const costo=Math.max(0,parseFloat($('costo').value)||0);
+  const unid=Math.max(1,parseInt($('unid').value)||1);
+  const resp=Math.max(1,parseInt($('resp').value)||1);
+  let cuotas=Math.max(1,parseInt($('cuotas').value)||1);
+  const total=costo*unid, porResp=total/resp;
+
+  let msg;
+  if(porResp<=LIMITE){
+    cuotas=1;
+    msg=`A cada responsable le toca ${Q(porResp)}, que no pasa de ${Q(LIMITE)}: se factura <b>de una sola vez</b> y lo paga dentro de sus días de crédito.`;
+  }else{
+    msg=`A cada responsable le toca ${Q(porResp)}, más de ${Q(LIMITE)}: se cobra en las <b>${cuotas} cuota(s)</b> que eligió.`;
+  }
+  if(resp>1) msg+=` El total se divide en partes iguales entre ${resp} responsables.`;
+
+  // cuotas en centavos para que la suma cuadre exacto
+  const cent=Math.round(porResp*100), base=Math.floor(cent/cuotas), resto=cent-base*cuotas;
+  const lista=Array.from({length:cuotas},(_,i)=>(base+(i<resto?1:0))/100);
+
+  $('rTotal').textContent=Q(total);
+  $('rResp').textContent=Q(porResp);
+  $('rCuota').textContent=cuotas===1?Q(porResp):Q(lista[0]);
+  $('regla').innerHTML=msg;
+
+  const m0=parseInt($('mes').value), a0=hoy.getFullYear();
+  $('cal').innerHTML='<tr><th>Cuota</th><th>Mes</th><th class="n">Monto</th></tr>'+
+    lista.map((v,i)=>{const k=m0+i;return `<tr><td>${i+1} de ${cuotas}</td><td>${MESES[k%12]} ${a0+Math.floor(k/12)}</td><td class="n">${Q(v)}</td></tr>`}).join('')+
+    `<tr><td colspan="2"><b>Total por responsable</b></td><td class="n"><b>${Q(porResp)}</b></td></tr>`;
+}
+['costo','unid','resp','cuotas','mes'].forEach(id=>$(id).addEventListener('input',calcular));
+calcular();
+</script>
+</body>
+</html>
